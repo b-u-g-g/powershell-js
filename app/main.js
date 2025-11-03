@@ -136,8 +136,9 @@ rl.on("line", (line) => {
     }
     rl.prompt();
   } else {
-    const pathDirs = process.env.PATH.split(path.delimiter);
     let fullPath = null;
+    const pathDirs = process.env.PATH.split(path.delimiter);
+
 
     for (const dir of pathDirs) {
       const potentialPath = path.join(dir, cmd);
@@ -151,6 +152,16 @@ rl.on("line", (line) => {
       } catch (_) {
         continue;
       }
+    }
+
+    if (!fullPath) {
+      try {
+        const stats = fs.statSync(cmd);
+        fs.accessSync(cmd, fs.constants.X_OK);
+        if (stats.isFile()) {
+          fullPath = cmd;
+        }
+      } catch (_) {}
     }
 
     if (fullPath) {
