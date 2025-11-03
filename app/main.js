@@ -74,6 +74,40 @@ rl.on("line", (line) => {
 
   if (current !== "") parts.push(current);
 
+  // ✅ Detect all redirection operators
+  let outRedirectIndex = parts.findIndex((p) => p === ">" || p === "1>");
+  let appendOutIndex = parts.findIndex((p) => p === ">>" || p === "1>>");
+  let errRedirectIndex = parts.findIndex((p) => p === "2>");
+  let appendErrIndex = parts.findIndex((p) => p === "2>>");
+
+  let outFile = null;
+  let appendFile = null;
+  let errFile = null;
+  let appendErrFile = null;
+
+  if (outRedirectIndex !== -1) {
+    outFile = parts[outRedirectIndex + 1];
+    parts.splice(outRedirectIndex, 2);
+  }
+
+  if (appendOutIndex !== -1) {
+    appendFile = parts[appendOutIndex + 1];
+    parts.splice(appendOutIndex, 2);
+  }
+
+  if (errRedirectIndex !== -1) {
+    errFile = parts[errRedirectIndex + 1];
+    parts.splice(errRedirectIndex, 2);
+    fs.writeFileSync(errFile, "");
+  }
+
+  if (appendErrIndex !== -1) {
+    appendErrFile = parts[appendErrIndex + 1];
+    parts.splice(appendErrIndex, 2);
+    // ✅ Ensure the file exists even if nothing is written
+    if (!fs.existsSync(appendErrFile)) fs.writeFileSync(appendErrFile, "");
+  }
+
   const cmd = parts[0];
   const args = parts.slice(1);
 
@@ -82,10 +116,24 @@ rl.on("line", (line) => {
     rl.close();
     process.exit(code);
   } else if (cmd === "echo") {
-    console.log(args.join(" "));
+    const output = args.join(" ") + "\n";
+    if (outFile) {
+      fs.writeFileSync(outFile, output);
+    } else if (appendFile) {
+      fs.appendFileSync(appendFile, output);
+    } else {
+      process.stdout.write(output);
+    }
     rl.prompt();
   } else if (cmd === "pwd") {
-    console.log(process.cwd());
+    const output = process.cwd() + "\n";
+    if (outFile) {
+      fs.writeFileSync(outFile, output);
+    } else if (appendFile) {
+      fs.appendFileSync(appendFile, output);
+    } else {
+      process.stdout.write(output);
+    }
     rl.prompt();
   } else if (cmd === "cd") {
     let targetDir = args[0];
@@ -139,7 +187,6 @@ rl.on("line", (line) => {
     let fullPath = null;
     const pathDirs = process.env.PATH.split(path.delimiter);
 
-
     for (const dir of pathDirs) {
       const potentialPath = path.join(dir, cmd);
       try {
@@ -165,7 +212,24 @@ rl.on("line", (line) => {
     }
 
     if (fullPath) {
-      const child = spawn(fullPath, args, { stdio: "inherit", argv0: cmd });
+      let stdio;
+      if (outFile || appendFile || errFile || appendErrFile) {
+        const stdoutFd = outFile
+          ? fs.openSync(outFile, "w")
+          : appendFile
+          ? fs.openSync(appendFile, "a")
+          : "inherit";
+        const stderrFd = errFile
+          ? fs.openSync(errFile, "w")
+          : appendErrFile
+          ? fs.openSync(appendErrFile, "a")
+          : "inherit";
+        stdio = ["inherit", stdoutFd, stderrFd];
+      } else {
+        stdio = "inherit";
+      }
+
+      const child = spawn(fullPath, args, { stdio, argv0: cmd });
       child.on("exit", () => rl.prompt());
     } else {
       console.log(`${cmd}: command not found`);
