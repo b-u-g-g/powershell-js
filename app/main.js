@@ -20,7 +20,60 @@ rl.on("line", (line) => {
     return;
   }
 
-  const parts = input.split(" ");
+  const parts = [];
+  let current = "";
+  let inSingleQuotes = false;
+  let inDoubleQuotes = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+
+    if (c === "'" && !inDoubleQuotes) {
+      inSingleQuotes = !inSingleQuotes;
+      continue;
+    }
+
+    if (c === '"' && !inSingleQuotes) {
+      inDoubleQuotes = !inDoubleQuotes;
+      continue;
+    }
+
+    if (c === "\\" && !inSingleQuotes) {
+      const next = input[i + 1];
+      if (inDoubleQuotes) {
+        if (next === '"' || next === "\\" || next === "$" || next === "`") {
+          i++;
+          current += next;
+        } else {
+          current += "\\";
+        }
+      } else {
+        if (next === " ") {
+          i++;
+          current += " ";
+        } else if (next === "\\") {
+          i++;
+          current += "\\";
+        } else if (next) {
+          i++;
+          current += next;
+        }
+      }
+      continue;
+    }
+
+    if (c === " " && !inSingleQuotes && !inDoubleQuotes) {
+      if (current !== "") {
+        parts.push(current);
+        current = "";
+      }
+    } else {
+      current += c;
+    }
+  }
+
+  if (current !== "") parts.push(current);
+
   const cmd = parts[0];
   const args = parts.slice(1);
 
@@ -36,15 +89,13 @@ rl.on("line", (line) => {
     rl.prompt();
   } else if (cmd === "cd") {
     let targetDir = args[0];
-
     if (!targetDir) {
       rl.prompt();
       return;
     }
 
-    // ✅ Handle '~' as the user's home directory
     if (targetDir === "~") {
-      targetDir = process.env.HOME || process.env.USERPROFILE; // cross-platform
+      targetDir = process.env.HOME || process.env.USERPROFILE;
     }
 
     try {
