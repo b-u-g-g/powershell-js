@@ -2,14 +2,78 @@ const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
 const { spawn } = require("child_process");
+const { executePipeline } = require("./pipeline");
+
+let lastCompletionInput = "";
+let lastCompletionTime = 0;
+
+function longestCommonPrefix(strings) {
+  if (strings.length === 0) return "";
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (strings[i].indexOf(prefix) !== 0) {
+      prefix = prefix.slice(0, -1);
+      if (prefix === "") return "";
+    }
+  }
+  return prefix;
+}
+
+const builtins = ["echo", "exit", "type", "pwd", "cd"];
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
   prompt: "$ ",
-});
+  completer: (line) => {
+    const split = line.trim().split(" ");
+    if (split.length === 1) {
+      const input = line.trim();
+      const pathDirs = process.env.PATH.split(path.delimiter);
+      const externalCommands = [];
 
-const builtins = ["echo", "exit", "type", "pwd", "cd"];
+      for (const dir of pathDirs) {
+        try {
+          const files = fs.readdirSync(dir);
+          for (const file of files) {
+            const fullPath = path.join(dir, file);
+            try {
+              const stats = fs.statSync(fullPath);
+              fs.accessSync(fullPath, fs.constants.X_OK);
+              if (stats.isFile()) externalCommands.push(file);
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      const allCommands = [...new Set([...builtins, ...externalCommands])];
+      const hits = allCommands.filter((cmd) => cmd.startsWith(input));
+
+      if (hits.length === 0) {
+        process.stdout.write("\x07");
+        return [[], line];
+      }
+
+      if (hits.length === 1) return [[hits[0] + " "], line];
+
+      const lcp = longestCommonPrefix(hits);
+      if (lcp.length > input.length) return [[lcp], line];
+
+      const now = Date.now();
+      if (lastCompletionInput === input && now - lastCompletionTime < 1000) {
+        process.stdout.write("\n" + hits.sort().join("  ") + "\n");
+        rl.prompt(true);
+        lastCompletionInput = "";
+      } else {
+        process.stdout.write("\x07");
+        lastCompletionInput = input;
+        lastCompletionTime = now;
+      }
+      return [[], line];
+    }
+    return [[], line];
+  },
+});
 
 rl.prompt();
 
@@ -17,6 +81,16 @@ rl.on("line", (line) => {
   const input = line.trim();
   if (!input) {
     rl.prompt();
+    return;
+  }
+
+  // ✅ NEW: Handle pipelines like "cat file | wc"
+  if (input.includes("|")) {
+    const [left, right] = input.split("|").map((s) => s.trim());
+    const [cmd1, ...args1] = left.split(" ");
+    const [cmd2, ...args2] = right.split(" ");
+executePipeline(cmd1, args1, cmd2, args2, rl, builtins);
+
     return;
   }
 
@@ -74,7 +148,6 @@ rl.on("line", (line) => {
 
   if (current !== "") parts.push(current);
 
-  // ✅ Detect all redirection operators
   let outRedirectIndex = parts.findIndex((p) => p === ">" || p === "1>");
   let appendOutIndex = parts.findIndex((p) => p === ">>" || p === "1>>");
   let errRedirectIndex = parts.findIndex((p) => p === "2>");
@@ -104,7 +177,6 @@ rl.on("line", (line) => {
   if (appendErrIndex !== -1) {
     appendErrFile = parts[appendErrIndex + 1];
     parts.splice(appendErrIndex, 2);
-    // ✅ Ensure the file exists even if nothing is written
     if (!fs.existsSync(appendErrFile)) fs.writeFileSync(appendErrFile, "");
   }
 
