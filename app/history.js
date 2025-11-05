@@ -2,7 +2,7 @@ const fs = require("fs");
 
 let commandHistory = [];
 let historyIndex = -1;
-let lastWrittenIndex = 0; // ✅ Track last command index written with -a
+let lastWrittenIndex = 0; 
 
 // Add command to history
 function addHistory(command) {
@@ -53,7 +53,7 @@ function writeHistoryFile(filePath) {
   }
 }
 
-// ✅ Append new commands to file for `history -a <file>`
+// Append new commands to file for `history -a <file>`
 function appendHistoryFile(filePath) {
   try {
     if (lastWrittenIndex >= commandHistory.length) return; // nothing new

@@ -1,4 +1,3 @@
-// quoting.js
 function parseArgs(input) {
   const args = [];
   let current = "";

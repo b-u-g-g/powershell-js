@@ -33,7 +33,7 @@ function getAbsPath(cmd) {
 // ================= BUILTINS =================
 const commands = {
   exit: (code) => {
-    // ✅ save history to HISTFILE if set on exit
+    // save history to HISTFILE if set on exit
     if (process.env.HISTFILE) {
       try {
         writeHistoryFile(process.env.HISTFILE);
@@ -75,8 +75,38 @@ const commands = {
       console.log(`cd: ${targetPath}: No such file or directory`);
     }
   },
+    dir: (...args) => {
+    try {
+      const dirPath = args[0] ? path.resolve(process.cwd(), args[0]) : process.cwd();
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
 
-  // ✅ history builtin now supports -r, -w, -a, <n>, and plain
+      for (const file of files) {
+        const stats = fs.statSync(path.join(dirPath, file.name));
+        const size = stats.isDirectory() ? "<DIR>" : `${stats.size} bytes`;
+        console.log(`${file.isDirectory() ? "📁" : "📄"} ${file.name}  ${size}`);
+      }
+    } catch (err) {
+      console.error(`dir: ${err.message}`);
+    }
+  },
+cat: (...args) => {
+  if (args.length === 0) {
+    console.log("cat: missing file operand");
+    return;
+  }
+
+  for (const file of args) {
+    try {
+      const content = fs.readFileSync(file, "utf8");
+      process.stdout.write(content);
+    } catch (err) {
+      console.error(`cat: ${file}: ${err.message}`);
+    }
+  }
+},
+
+
+  //  history builtin now supports -r, -w, -a, <n>, and plain
   history: (flagOrArg, maybeFile) => {
     // history -r <file>
     if (flagOrArg === "-r" && maybeFile) {
@@ -237,7 +267,7 @@ function repl() {
   });
 }
 
-// ✅ Auto-load history on startup if HISTFILE is set
+// Auto-load history on startup if HISTFILE is set
 if (process.env.HISTFILE) {
   try {
     readHistoryFile(process.env.HISTFILE);

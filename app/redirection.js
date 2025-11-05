@@ -1,9 +1,5 @@
-// redirection.js
 const fs = require("fs");
 
-/**
- * Handle redirection operators: >, >>, 2>, 2>>, 2>&1
- */
 function applyRedirection(args) {
   let stdout = null;
   let stderr = null;
