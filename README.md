@@ -1,34 +1,83 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/bc20020f-d210-4725-a1b2-9262d11dd33a)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+Here’s a clean, concise **README.md** version without emojis — ideal for your project repo:
 
-This is a starting point for JavaScript solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+---
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+# PowerShell-JS
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+A lightweight Node.js-based shell that mimics basic PowerShell/Bash behavior.
+Supports command execution, pipelines, redirection, and history management.
 
-# Passing the first stage
+---
 
-The entry point for your `shell` implementation is in `app/main.js`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+## Features
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
+### Core Shell
+
+* Interactive `$` prompt using `readline`
+* PATH-based command resolution
+* Multi-command pipelines (`|`)
+* Output and error redirection (`>`, `>>`, `2>`, `2>>`)
+* Environment variable support (`HISTFILE` for history persistence)
+
+### Built-in Commands
+
+* **exit [code]** – exits shell and writes history to file if set
+* **echo [-n] [args...]** – prints arguments
+* **type [command]** – identifies builtins or binaries
+* **pwd** – prints current working directory
+* **cd [path]** – changes directory
+* **history** – lists or manages command history
+
+  * `history <n>` – last *n* commands
+  * `history -r <file>` – read from file
+  * `history -w <file>` – write to file
+  * `history -a <file>` – append new commands
+
+### History Navigation
+
+* `↑` and `↓` recall previous or next commands
+* Commands executed via Enter are re-added to memory
+* Auto-loads and writes history on startup/exit if `HISTFILE` is defined
+
+---
+
+## Example Usage
+
+```bash
+echo dog > animals.txt
+echo cat >> animals.txt
+cat animals.txt | findstr b | findstr a
+pwd
+history
+exit 0
 ```
 
-Time to move on to the next stage!
+---
 
-# Stage 2 & beyond
+## Limitations and Future Work
 
-Note: This section is for stages 2 and beyond.
+* `type` command identifies commands but cannot display file contents
+  (can be improved by adding a `cat` builtin)
+* Pipelines currently use synchronous execution; can be optimized using streams
+* `echo` does not yet interpret escape sequences (`\n`, `\t`)
+* Error handling and invalid argument feedback can be enhanced
+* Command parsing is basic; future improvement could use token-based parsing
 
-1. Ensure you have `node (21)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `app/main.js`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+---
+
+## File Structure
+
+```
+app/
+ ├── main.js          # Shell core (REPL, builtins, I/O handling)
+ ├── history.js       # History management (read, write, append)
+ ├── pipeline.js      # Handles pipe-based execution
+ ├── quoting.js       # Command argument parsing
+ ├── autocomplete.js  # Basic tab completion
+ └── redirection.js   # Handles output/error redirection
+
+
+<img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/8ad6e0a7-6ef8-4366-adf1-a5d77ade655f" />
+
+
+Would you like me to format this as a ready-to-save `README.md` file (with markdown headings, spacing, and code blocks intact)?
