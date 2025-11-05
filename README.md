@@ -1,13 +1,11 @@
-Here’s a clean, concise **README.md** version without emojis — ideal for your project repo:
 
----
 
 # PowerShell-JS
 
 A lightweight Node.js-based shell that mimics basic PowerShell/Bash behavior.
 Supports command execution, pipelines, redirection, and history management.
 
----
+
 
 ## Features
 
