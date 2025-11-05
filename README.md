@@ -39,14 +39,8 @@ Supports command execution, pipelines, redirection, and history management.
 
 ## Example Usage
 
-```bash
-echo dog > animals.txt
-echo cat >> animals.txt
-cat animals.txt | findstr b | findstr a
-pwd
-history
-exit 0
-```
+<img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/d615ceaa-1717-4826-9b1f-44373987e2e6" />
+
 
 ---
 
@@ -74,11 +68,4 @@ app/
 
 
 
-<img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/d89004a4-230c-4e1b-90d0-8cbca71f6a24" />
 
-
-
-<img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/8ad6e0a7-6ef8-4366-adf1-a5d77ade655f" />
-
-
-Would you like me to format this as a ready-to-save `README.md` file (with markdown headings, spacing, and code blocks intact)?
