@@ -7,8 +7,6 @@ Supports command execution, pipelines, redirection, and history management.
 
 
 
-## Features
-
 ### Core Shell
 
 * Interactive `$` prompt using `readline`
@@ -73,6 +71,11 @@ app/
  ├── quoting.js       # Command argument parsing
  ├── autocomplete.js  # Basic tab completion
  └── redirection.js   # Handles output/error redirection
+
+
+
+<img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/d89004a4-230c-4e1b-90d0-8cbca71f6a24" />
+
 
 
 <img width="1038" height="706" alt="Screenshot 2025-11-06 000352" src="https://github.com/user-attachments/assets/8ad6e0a7-6ef8-4366-adf1-a5d77ade655f" />
