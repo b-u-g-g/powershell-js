@@ -1,135 +1,67 @@
+// pipeline.js
 const { spawn } = require("child_process");
-const fs = require("fs");
-const path = require("path");
-const { PassThrough, Readable } = require("stream");
+const { PassThrough } = require("stream");
 
-function findExecutable(cmd) {
-  const pathDirs = process.env.PATH.split(path.delimiter);
-  for (const dir of pathDirs) {
-    const fullPath = path.join(dir, cmd);
-    try {
-      const stats = fs.statSync(fullPath);
-      fs.accessSync(fullPath, fs.constants.X_OK);
-      if (stats.isFile()) return fullPath;
-    } catch (_) {}
-  }
-  return null;
-}
-
-// Handles builtins inside pipeline
-function runBuiltin(cmd, args, inputStream, outputStream, rl, builtins) {
-  const write = (msg) => {
-    if (outputStream && !outputStream.destroyed) outputStream.write(msg);
-  };
-
-  if (cmd === "echo") {
-    let buffer = args.join(" ") + "\n";
-    write(buffer);
-    if (outputStream !== process.stdout) outputStream.end();
-    return;
+function handlePipeline(input, parseArgs, commands, getAbsPath, safeRepl) {
+  const segments = input.split("|").map((s) => s.trim());
+  if (segments.length === 0 || segments[0] === "") {
+    return setTimeout(safeRepl, 10);
   }
 
-  if (cmd === "type") {
-    const target = args[0];
-    if (!target) {
-      write("type: missing argument\n");
-    } else if (builtins.includes(target)) {
-      write(`${target} is a shell builtin\n`);
-    } else {
-      const pathDirs = process.env.PATH.split(path.delimiter);
-      let found = false;
-      for (const dir of pathDirs) {
-        const fullPath = path.join(dir, target);
-        try {
-          const stats = fs.statSync(fullPath);
-          fs.accessSync(fullPath, fs.constants.X_OK);
-          if (stats.isFile()) {
-            write(`${target} is ${fullPath}\n`);
-            found = true;
-            break;
-          }
-        } catch (_) {}
+  const pipes = Array.from({ length: segments.length - 1 }, () => new PassThrough());
+  const processes = [];
+  let remaining = segments.length;
+
+  segments.forEach((segment, i) => {
+    const args = parseArgs(segment);
+    const cmd = args[0];
+    const isBuiltin = commands[cmd];
+    const stdin = i === 0 ? process.stdin : pipes[i - 1];
+    const stdout = i === segments.length - 1 ? process.stdout : pipes[i];
+
+    if (isBuiltin) {
+      const chunks = [];
+      const originalWrite = process.stdout.write;
+      process.stdout.write = (chunk) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        return true;
+      };
+
+      try {
+        commands[cmd](...args.slice(1));
+      } catch (e) {
+        chunks.push(Buffer.from(e.message + "\n"));
       }
-      if (!found) write(`${target}: not found\n`);
+
+      process.stdout.write = originalWrite;
+      const output = Buffer.concat(chunks);
+      if (stdout !== process.stdout) {
+        stdout.write(output);
+        stdout.end();
+      } else {
+        process.stdout.write(output);
+      }
+
+      if (--remaining === 0) setTimeout(safeRepl, 10);
+    } else {
+      const proc = spawn(cmd, args.slice(1), { stdio: ["pipe", "pipe", "inherit"] });
+      if (stdin !== process.stdin) stdin.pipe(proc.stdin);
+      else proc.stdin.end();
+
+      proc.stdout.pipe(stdout);
+
+      proc.on("close", () => {
+        if (--remaining === 0) setTimeout(safeRepl, 10);
+      });
+
+      proc.on("error", () => {
+        console.error(`${cmd}: command not found`);
+        if (--remaining === 0) setTimeout(safeRepl, 10);
+      });
+
+      processes.push(proc);
     }
-    if (outputStream !== process.stdout) outputStream.end();
-    return;
-  }
-
-  if (cmd === "exit") {
-    const code = args[0] ? parseInt(args[0]) : 0;
-    rl.close();
-    process.exit(code);
-  }
-
-  if (cmd === "pwd") {
-    write(process.cwd() + "\n");
-    if (outputStream !== process.stdout) outputStream.end();
-    return;
-  }
-
-  if (outputStream !== process.stdout) outputStream.end();
+  });
 }
 
-function executePipeline(command1, args1, command2, args2, rl, builtins) {
-  const cmd1IsBuiltin = builtins.includes(command1);
-  const cmd2IsBuiltin = builtins.includes(command2);
-
-  // Case 1: both external
-  if (!cmd1IsBuiltin && !cmd2IsBuiltin) {
-    const cmd1Path = findExecutable(command1);
-    const cmd2Path = findExecutable(command2);
-    if (!cmd1Path || !cmd2Path) {
-      console.log(`${!cmd1Path ? command1 : command2}: command not found`);
-      rl.prompt();
-      return;
-    }
-    const first = spawn(cmd1Path, args1, { stdio: ["inherit", "pipe", "inherit"] });
-    const second = spawn(cmd2Path, args2, { stdio: ["pipe", "inherit", "inherit"] });
-    first.stdout.pipe(second.stdin);
-    second.on("close", () => rl.prompt());
-    return;
-  }
-
-  // Case 2: first builtin, second external
-  if (cmd1IsBuiltin && !cmd2IsBuiltin) {
-    const cmd2Path = findExecutable(command2);
-    if (!cmd2Path) {
-      console.log(`${command2}: command not found`);
-      rl.prompt();
-      return;
-    }
-    const second = spawn(cmd2Path, args2, { stdio: ["pipe", "inherit", "inherit"] });
-    runBuiltin(command1, args1, null, second.stdin, rl, builtins);
-    second.on("close", () => rl.prompt());
-    return;
-  }
-
-  // Case 3: first external, second builtin
-  if (!cmd1IsBuiltin && cmd2IsBuiltin) {
-    const cmd1Path = findExecutable(command1);
-    if (!cmd1Path) {
-      console.log(`${command1}: command not found`);
-      rl.prompt();
-      return;
-    }
-
-    const first = spawn(cmd1Path, args1, { stdio: ["inherit", "pipe", "inherit"] });
-    let buffer = "";
-    first.stdout.on("data", (data) => (buffer += data.toString()));
-    first.on("close", () => {
-      const inputStream = Readable.from(buffer);
-      runBuiltin(command2, args2, inputStream, process.stdout, rl, builtins);
-      rl.prompt();
-    });
-    return;
-  }
-
-  // Case 4: both builtins
-  const pipe = new PassThrough();
-  runBuiltin(command1, args1, null, pipe, rl, builtins);
-  runBuiltin(command2, args2, pipe, process.stdout, rl, builtins);
-  pipe.on("end", () => rl.prompt());
-}
-
-module.exports = { executePipeline };
+module.exports = { handlePipeline };
